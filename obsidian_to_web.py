@@ -33,6 +33,11 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title} - {site_title}</title>
+<meta name="description" content="{desc}">
+<meta name="keywords" content="{tags}">
+<meta property="og:title" content="{title}">
+<meta property="og:site_name" content="{site_title}">
+<meta property="og:type" content="article">
 <link rel="stylesheet" href="../style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 </head>
@@ -45,6 +50,7 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   <article>
     <h1 class="article-title">{title}</h1>
     <div class="article-meta">{meta}</div>
+    {tags_html}
     {content}
   </article>
 </main>
@@ -57,6 +63,11 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{site_title}</title>
+<meta name="description" content="{site_desc}">
+<meta name="keywords" content="道家,风水布局,符咒术法,民间文化,奇门遁甲,修炼修行,占卜预测">
+<meta property="og:title" content="{site_title}">
+<meta property="og:description" content="{site_desc}">
+<meta property="og:type" content="website">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -67,6 +78,9 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     <input type="text" id="searchInput" placeholder="搜索笔记标题..." autocomplete="off">
   </div>
   <div class="stats">共 {count} 篇笔记</div>
+  <div class="tag-filter-bar">
+    {tag_buttons}
+  </div>
 </header>
 <main class="notes-grid">
 {cards}
@@ -76,23 +90,67 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 </footer>
 <script>
 const searchInput = document.getElementById('searchInput');
+let activeTags = null;
 searchInput.addEventListener('input', function() {{
   const q = this.value.toLowerCase().trim();
   document.querySelectorAll('.note-card').forEach(card => {{
     const title = card.dataset.title.toLowerCase();
-    card.style.display = (!q || title.includes(q)) ? '' : 'none';
+    const tags = (card.dataset.tags || '').split('|');
+    const matchSearch = !q || title.includes(q);
+    const matchTags = !activeTags || tags.some(t => activeTags.includes(t.trim()));
+    card.style.display = (matchSearch && matchTags) ? '' : 'none';
   }});
 }});
+function toggleTag(tagName) {{
+  if (!activeTags) activeTags = [];
+  const idx = activeTags.indexOf(tagName);
+  if (idx > -1) activeTags.splice(idx, 1);
+  else activeTags.push(tagName);
+  if (activeTags.length === 0) activeTags = null;
+  // refresh
+  searchInput.dispatchEvent(new Event('input'));
+}}
 </script>
 </body>
 </html>"""
 
-CARD_TEMPLATE = """<a class="note-card" href="notes/{filename}" data-title="{title_escaped}">
+CARD_TEMPLATE = """<a class="note-card" href="notes/{filename}" data-title="{title_escaped}" data-tags="{tags}">
   <div class="card-body">
     <div class="card-title">{title}</div>
     <div class="card-date">{date}</div>
   </div>
 </a>"""
+
+TAG_PAGE_TEMPLATE = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{tag} - {site_title}</title>
+<meta name="description" content="{tag} — {site_title}中的{count}篇笔记">
+<meta name="keywords" content="{tag},{site_keywords}">
+<meta property="og:title" content="{tag}">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="topbar">
+  <a href="../index.html" class="back-link">← 返回首页</a>
+  <span class="site-name">{tag} · {count} 篇</span>
+</nav>
+<main class="article">
+  <h1 class="article-title">{tag}</h1>
+  <div class="article-meta">{site_title}</div>
+  <div class="tag-notes-list">
+{notes}
+  </div>
+</main>
+<footer class="footer">
+  <p><a href="../index.html" style="color:var(--accent)">← 返回首页</a></p>
+  <p>由 Obsidian 笔记自动生成 · {generated}</p>
+</footer>
+</body>
+</html>"""
 
 CSS = """*{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -147,15 +205,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans
 .article a{color:var(--accent)}
 .article ul,.article ol{margin:1rem 0 1rem 1.5rem}
 .article li{margin-bottom:.3rem}
-.article blockquote{border-left:3px solid var(--accent);padding-left:1rem;
+.article-blockquote{border-left:3px solid var(--accent);padding-left:1rem;
   margin:1rem 0;color:var(--muted)}
-.article code{background:var(--border);padding:.1rem .3rem;border-radius:.2rem;font-size:.9em}
-.article pre{background:#2c2418;color:#f0e8d8;padding:1rem;border-radius:.5rem;
+.article-blockcode{background:var(--border);padding:.1rem .3rem;border-radius:.2rem;font-size:.9em}
+.article-pre{background:#2c2418;color:#f0e8d8;padding:1rem;border-radius:.5rem;
   overflow-x:auto;margin:1rem 0}
-.article pre code{background:none;padding:0}
+.article-pre code{background:none;padding:0}
 .article table{width:100%;border-collapse:collapse;margin:1rem 0}
 .article th,.article td{border:1px solid var(--border);padding:.5rem .8rem;text-align:left}
 .article th{background:var(--card)}
+.tags-bar{display:flex;gap:.4rem;flex-wrap:wrap;margin:1rem 0 1.5rem}
+.tag{display:inline-block;padding:.15rem .6rem;background:var(--accent);
+  color:#fff;border-radius:2rem;font-size:.75rem;font-weight:500;
+  text-decoration:none;transition:opacity .2s}
+.tag:hover{opacity:.8}
+.tag-filter-bar{margin:1rem auto;display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap}
+.tag-filter-btn{display:inline-block;padding:.25rem .8rem;background:var(--card);
+  color:var(--text);border:1px solid var(--border);border-radius:2rem;
+  font-size:.8rem;text-decoration:none;transition:all .2s}
+.tag-filter-btn:hover,.tag-filter-btn.active{background:var(--accent);
+  color:#fff;border-color:var(--accent)}
+.tag-note-item{display:block;text-decoration:none;color:inherit;
+  background:var(--card);border:1px solid var(--border);border-radius:.5rem;
+  padding:1rem 1.2rem;margin-bottom:.5rem;transition:all .2s}
+.tag-note-item:hover{transform:translateY(-1px);box-shadow:0 4px 12px var(--shadow);
+  border-color:var(--accent)}
+.tag-note-item .tn-title{font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:.2rem}
+.tag-note-item .tn-date{font-size:.75rem;color:var(--muted)}
 
 .footer{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem}
 
@@ -214,6 +290,92 @@ def convert_obsidian_links(content: str) -> str:
     return content
 
 
+# ============ SEO Tags 配置 ============
+ALL_TAGS = [
+    "道家", "风水布局", "符咒术法",
+    "民间文化", "奇门遁甲", "修炼修行", "占卜预测"
+]
+
+TAG_KEYWORDS = {
+    "道家": ["道家", "道法", "吕祖", "金光咒", "道教", "道人", "道门", "太上"],
+    "风水布局": ["风水", "阳宅", "阴宅", "财位", "煞气", "罗盘", "峦头", "理气",
+                 "八宅", "玄空", "太岁", "化解", "布局", "罗经", "龙脉", "藏风",
+                 "得水", "明堂", "案山", "朝山", "土公", "地师"],
+    "符咒术法": ["符咒", "符字", "禁咒", "祝由", "咒语", "开光", "施食", "变亿",
+                 "摄召", "召将", "师刀", "罡", "诀", "印", "法事", "法坛", "法器",
+                 "护法", "童子", "降妖", "伏魔", "驱邪", "镇宅", "安太岁"],
+    "民间文化": ["民间", "偏方", "土方", "习俗", "祭祀", "祖先", "香火", "庙会",
+                 "拜神", "还愿", "许愿", "供桌", "神龛", "土地公", "灶王",
+                 "财神", "关帝", "观音", "妈祖", "王爷", "保生大帝"],
+    "奇门遁甲": ["奇门", "遁甲", "九宫", "八门", "九星", "八神", "天干", "地支",
+                 "排盘", "拆补", "置闰", "值符", "值使", "天盘", "地盘", "隐干",
+                 "击刑", "入墓", "马星", "空亡", "旬首", "时家", "日家", "年家"],
+    "修炼修行": ["修炼", "打坐", "站桩", "辟谷", "静坐", "冥想", "入定", "出神",
+                 "内炼", "外练", "气功", "导引", "吐纳", "周天", "丹田", "经脉",
+                 "炼精化气", "炼气化神", "炼神还虚", "炼虚合道", "三宝", "精气神",
+                 "元神", "识神", "性功", "命功", "双修", "采补", "导引", "服食"],
+    "占卜预测": ["占卜", "预测", "算命", "八字", "流年", "大运", "趋吉避凶", "六爻",
+                 "梅花", "太乙", "小六壬", "铁板", "紫微", "面相", "手相", "测字",
+                 "起名", "择日", "合婚", "摇卦", "抽签", "问卦", "起课"]
+}
+
+
+def select_tags(title: str, content: str) -> list:
+    """根据标题和内容，从关键词匹配中选择1-3个tag"""
+    text = title + content
+    scored = {}
+    for tag, keywords in TAG_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in text)
+        if score > 0:
+            scored[tag] = score
+    # 取得分最高的最多3个
+    sorted_tags = sorted(scored.items(), key=lambda x: (-x[1], x[0]))
+    return [t[0] for t in sorted_tags[:3]]
+
+
+# ============ SEO Tags 配置 ============
+ALL_TAGS = [
+    "道家", "风水布局", "符咒术法",
+    "民间文化", "奇门遁甲", "修炼修行", "占卜预测"
+]
+
+TAG_KEYWORDS = {
+    "道家": ["道家", "道法", "吕祖", "金光咒", "道教", "道人", "道门", "太上"],
+    "风水布局": ["风水", "阳宅", "阴宅", "财位", "煞气", "罗盘", "峦头", "理气",
+                 "八宅", "玄空", "太岁", "化解", "布局", "罗经", "龙脉", "藏风",
+                 "得水", "明堂", "案山", "朝山", "土公", "地师"],
+    "符咒术法": ["符咒", "符字", "禁咒", "祝由", "咒语", "开光", "施食", "变亿",
+                 "摄召", "召将", "师刀", "罡", "诀", "印", "法事", "法坛", "法器",
+                 "护法", "童子", "降妖", "伏魔", "驱邪", "镇宅", "安太岁"],
+    "民间文化": ["民间", "偏方", "土方", "习俗", "祭祀", "祖先", "香火", "庙会",
+                 "拜神", "还愿", "许愿", "供桌", "神龛", "土地公", "灶王",
+                 "财神", "关帝", "观音", "妈祖", "王爷", "保生大帝"],
+    "奇门遁甲": ["奇门", "遁甲", "九宫", "八门", "九星", "八神", "天干", "地支",
+                 "排盘", "拆补", "置闰", "值符", "值使", "天盘", "地盘", "隐干",
+                 "击刑", "入墓", "马星", "空亡", "旬首", "时家", "日家", "年家"],
+    "修炼修行": ["修炼", "打坐", "站桩", "辟谷", "静坐", "冥想", "入定", "出神",
+                 "内炼", "外练", "气功", "导引", "吐纳", "周天", "丹田", "经脉",
+                 "炼精化气", "炼气化神", "炼神还虚", "炼虚合道", "三宝", "精气神",
+                 "元神", "识神", "性功", "命功", "双修", "采补", "导引", "服食"],
+    "占卜预测": ["占卜", "预测", "算命", "八字", "流年", "大运", "趋吉避凶", "六爻",
+                 "梅花", "太乙", "小六壬", "铁板", "紫微", "面相", "手相", "测字",
+                 "起名", "择日", "合婚", "摇卦", "抽签", "问卦", "起课"]
+}
+
+
+def select_tags(title: str, content: str) -> list:
+    """根据标题和内容，从关键词匹配中选择1-3个tag"""
+    text = title + content
+    scored = {}
+    for tag, keywords in TAG_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in text)
+        if score > 0:
+            scored[tag] = score
+    # 取得分最高的最多3个
+    sorted_tags = sorted(scored.items(), key=lambda x: (-x[1], x[0]))
+    return [t[0] for t in sorted_tags[:3]]
+
+
 def process_markdown(content: str) -> tuple:
     """处理 markdown 内容，返回 (html_content, referenced_media)"""
     referenced = set()
@@ -259,8 +421,16 @@ def main():
         relative_path = f"notes/{html_filename}"
 
         # 读取并处理
-        content = md_file.read_text(encoding='utf-8')
-        html_content, referenced = process_markdown(content)
+        raw_content = md_file.read_text(encoding='utf-8')
+        html_content, referenced = process_markdown(raw_content)
+
+        # SEO: 选择 tags
+        tags = select_tags(title, raw_content)
+        tags_list = ", ".join(tags)
+        tags_desc = title[:80] + " — " + (tags[0] if tags else "")
+        tags_html = ''.join(
+            f'<a class="tag" href="../tag/{t}.html">{t}</a>' for t in tags
+        ) if tags else ''
 
         all_referenced_media.update(referenced)
 
@@ -268,8 +438,11 @@ def main():
         meta = f"📅 {date_str}" if date_str else ""
         page_html = PAGE_TEMPLATE.format(
             title=html.escape(title),
+            desc=html.escape(tags_desc),
+            tags=html.escape(tags_list),
             site_title=SITE_TITLE,
             meta=meta,
+            tags_html=tags_html,
             content=html_content
         )
 
@@ -280,7 +453,8 @@ def main():
             filename=html_filename,
             title=html.escape(title),
             title_escaped=html.escape(title).lower(),
-            date=date_str
+            date=date_str,
+            tags=html.escape("| ".join(tags))
         )
         cards_html.append(card_html)
 
@@ -303,12 +477,56 @@ def main():
             missing += 1
     print(f"  成功复制 {found} 个，缺失 {missing} 个")
 
-    # 生成 index.html
+    # 生成 tag 分类页面
+    print("\n生成 Tag 分类页面...")
+    tag_to_notes = {t: [] for t in ALL_TAGS}
+    for md_file in md_files:
+        title = md_file.stem
+        date_str = parse_date_from_filename(md_file.name)
+        html_filename = slugify(md_file.name)
+        tags = select_tags(title, md_file.read_text(encoding='utf-8'))
+        for tag in tags:
+            tag_to_notes[tag].append({
+                'title': title,
+                'date': date_str,
+                'filename': html_filename,
+                'href': f'notes/{html_filename}'
+            })
+
+    TAG_NOTES_TEMPLATE = '<a class="tag-note-item" href="{href}"><div class="tn-title">{title}</div><div class="tn-date">{date}</div></a>'
+    tag_count_total = 0
+    for tag in ALL_TAGS:
+        notes = tag_to_notes[tag]
+        if not notes:
+            continue
+        notes_html = '\n'.join(
+            TAG_NOTES_TEMPLATE.format(**n) for n in notes
+        )
+        tag_page = TAG_PAGE_TEMPLATE.format(
+            tag=tag,
+            site_title=SITE_TITLE,
+            site_keywords=", ".join(ALL_TAGS),
+            count=len(notes),
+            notes=notes_html,
+            generated=datetime.now().strftime("%Y-%m-%d")
+        )
+        tag_dir = OUTPUT_DIR / "tag"
+        tag_dir.mkdir(exist_ok=True)
+        (tag_dir / f"{tag}.html").write_text(tag_page, encoding='utf-8')
+        tag_count_total += len(notes)
+        print(f"  {tag}: {len(notes)} 篇")
+
+    # 更新首页的卡片加入 data-tags
+    tag_buttons_html = ''.join(
+        f'<a class="tag-filter-btn" href="javascript:toggleTag(\'{t}\')">{t}</a>' for t in ALL_TAGS
+    )
     index_html = INDEX_TEMPLATE.format(
         site_title=SITE_TITLE,
+        site_desc=f"{SITE_SUBTITLE} — 共 {len(md_files)} 篇实战笔记",
         site_subtitle=SITE_SUBTITLE,
         count=len(md_files),
         cards="\n".join(cards_html),
+        tag_buttons=tag_buttons_html,
         generated=datetime.now().strftime("%Y-%m-%d")
     )
     (OUTPUT_DIR / "index.html").write_text(index_html, encoding='utf-8')
