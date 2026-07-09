@@ -402,18 +402,70 @@ def main():
 
     # 清理输出目录
     if OUTPUT_DIR.exists():
-        shutil.rmtree(OUTPUT_DIR)
+        os.system(f'rm -rf "{OUTPUT_DIR}"')
     OUTPUT_DIR.mkdir(parents=True)
     ASSETS_DIR.mkdir()
     PAGES_DIR.mkdir()
 
-    # 收集所有 markdown 文件
+    # 置顶推荐笔记
+    PINNED_NOTES = [
+        "20251210【玄门秘术】开光科仪与咒语汇编 紫鸢真人传授.md",
+        "20251208道家金光咒与吕祖观月内炼法 紫鸢真人传授.md",
+        "20251208开剑指，手抄本 轩辕祝由术，民间秘传修法.md",
+    ]
+    pinned_set = set(PINNED_NOTES)
+    
+    # 收集所有 markdown 文件（排除置顶笔记，置顶笔记单独处理）
     md_files = sorted(NOTES_DIR.glob("*.md"), key=lambda f: f.name, reverse=True)
-    print(f"\n找到 {len(md_files)} 篇笔记")
+    md_files = [f for f in md_files if f.name not in pinned_set]
+    
+    print(f"\n找到 {len(md_files)} 篇笔记（不含 {len(PINNED_NOTES)} 篇置顶）")
 
     all_referenced_media = set()
     cards_html = []
 
+    # ========== 先处理置顶笔记，放在最前面 ==========
+    for pinned_md in PINNED_NOTES:
+        pinned_file = NOTES_DIR / pinned_md
+        if not pinned_file.exists():
+            print(f"  ⚠ 置顶文件不存在: {pinned_md}")
+            continue
+        title = pinned_file.stem
+        date_str = parse_date_from_filename(pinned_file.name)
+        html_filename = slugify(pinned_file.name)
+        raw_content = pinned_file.read_text(encoding='utf-8')
+        html_content, referenced = process_markdown(raw_content)
+        tags = select_tags(title, raw_content)
+        tags_list = ", ".join(tags)
+        tags_desc = title[:80] + " — " + (tags[0] if tags else "")
+        tags_html = ''.join(
+            f'<a class="tag" href="../tag/{t}.html">{t}</a>' for t in tags
+        ) if tags else ''
+        all_referenced_media.update(referenced)
+        meta = f"📅 {date_str}" if date_str else ""
+        page_html = PAGE_TEMPLATE.format(
+            title=html.escape(title),
+            desc=html.escape(tags_desc),
+            tags=html.escape(tags_list),
+            site_title=SITE_TITLE,
+            meta=meta,
+            tags_html=tags_html,
+            content=html_content
+        )
+        (PAGES_DIR / html_filename).write_text(page_html, encoding='utf-8')
+        print(f"  ★ 置顶: {pinned_md}")
+        # 生成置顶卡片（带头部标识）
+        pinned_card = f'''<div style="background:linear-gradient(135deg,#8b6914,#a67c00);color:#fff;padding:.3rem .8rem;border-radius:.3rem;margin-bottom:.5rem;font-weight:600;font-size:.85rem;text-align:center;">★ 置顶推荐</div>'''
+        pinned_html = CARD_TEMPLATE.format(
+            filename=html_filename,
+            title=html.escape(title),
+            title_escaped=html.escape(title).lower(),
+            date=date_str,
+            tags=html.escape("| ".join(tags))
+        )
+        cards_html.insert(0, pinned_card + pinned_html)
+
+    # ========== 处理剩余笔记 ==========
     for md_file in md_files:
         title = md_file.stem
         date_str = parse_date_from_filename(md_file.name)
@@ -520,11 +572,12 @@ def main():
     tag_buttons_html = ''.join(
         f'<a class="tag-filter-btn" href="javascript:toggleTag(\'{t}\')">{t}</a>' for t in ALL_TAGS
     )
+    total_count = len(md_files) + len(PINNED_NOTES)
     index_html = INDEX_TEMPLATE.format(
         site_title=SITE_TITLE,
-        site_desc=f"{SITE_SUBTITLE} — 共 {len(md_files)} 篇实战笔记",
+        site_desc=f"{SITE_SUBTITLE} — 共 {total_count} 篇实战笔记",
         site_subtitle=SITE_SUBTITLE,
-        count=len(md_files),
+        count=total_count,
         cards="\n".join(cards_html),
         tag_buttons=tag_buttons_html,
         generated=datetime.now().strftime("%Y-%m-%d")
@@ -540,7 +593,9 @@ def main():
 
     print(f"\n{'=' * 60}")
     print(f"转换完成!")
-    print(f"  笔记页面: {len(md_files)} 篇")
+    print(f"  置顶笔记: {len(PINNED_NOTES)} 篇")
+    print(f"  普通笔记: {len(md_files)} 篇")
+    print(f"  总计:     {total_count} 篇")
     print(f"  媒体文件: {found} 个")
     print(f"  输出目录: {OUTPUT_DIR}")
     print(f"  总大小:   {size_mb:.1f} MB")
