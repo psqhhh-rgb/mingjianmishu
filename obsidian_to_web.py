@@ -395,6 +395,56 @@ def process_markdown(content: str) -> tuple:
     return html_content, referenced
 
 
+def auto_split_large_file(md_file: Path) -> list:
+    """自动检测并拆分大于 25MB 的文件，返回拆分后的文件列表"""
+    size = md_file.stat().st_size
+    size_mb = size / (1024 * 1024)
+    
+    if size_mb <= 25:
+        return [md_file]
+    
+    print(f"\n  ⚠ 检测到大文件: {md_file.name} ({size_mb:.1f} MB)，自动拆分...")
+    
+    # 读取文件内容
+    content = md_file.read_text(encoding='utf-8')
+    
+    # 查找所有图片嵌入位置
+    matches = list(re.finditer(r'!\[[^\]]*\]\(data:image', content))
+    
+    if not matches:
+        # 没有图片，按文本行数平分
+        mid = len(content) // 2
+        part1 = content[:mid]
+        part2 = content[mid:]
+    else:
+        # 按图片位置拆分(前一半图片在上一篇，后一半在下一篇)
+        mid_idx = len(matches) // 2
+        split_point = matches[mid_idx].start()
+        part1 = content[:split_point]
+        part2 = content[split_point:]
+    
+    # 生成拆分文件名
+    stem = md_file.stem
+    suffix = md_file.suffix
+    part1_file = md_file.parent / f"{stem}（上）{suffix}"
+    part2_file = md_file.parent / f"{stem}（下）{suffix}"
+    
+    # 写入拆分文件
+    part1_file.write_text(part1, encoding='utf-8')
+    part2_file.write_text(part2, encoding='utf-8')
+    
+    # 计算拆分后文件大小
+    size1 = part1_file.stat().st_size / (1024 * 1024)
+    size2 = part2_file.stat().st_size / (1024 * 1024)
+    print(f"  拆分完成: 上篇 {size1:.1f} MB, 下篇 {size2:.1f} MB")
+    
+    # 删除原文件
+    md_file.unlink()
+    print(f"  已删除原文件: {md_file.name}")
+    
+    return [part1_file, part2_file]
+
+
 def main():
     print("=" * 60)
     print("Obsidian → 静态网站转换器")
@@ -466,7 +516,13 @@ def main():
         cards_html.insert(0, pinned_card + pinned_html)
 
     # ========== 处理剩余笔记 ==========
+    all_md_files = []
     for md_file in md_files:
+        # 检查并拆分大文件
+        split_files = auto_split_large_file(md_file)
+        all_md_files.extend(split_files)
+    
+    for md_file in all_md_files:
         title = md_file.stem
         date_str = parse_date_from_filename(md_file.name)
         html_filename = slugify(md_file.name)
@@ -590,11 +646,14 @@ def main():
     # 统计输出大小
     total_size = sum(f.stat().st_size for f in OUTPUT_DIR.rglob('*') if f.is_file())
     size_mb = total_size / (1024 * 1024)
+    
+    # 统计拆分后的文件数
+    split_count = sum(1 for f in all_md_files if f.name.endswith('（上）.md') or f.name.endswith('（下）.md'))
 
     print(f"\n{'=' * 60}")
     print(f"转换完成!")
     print(f"  置顶笔记: {len(PINNED_NOTES)} 篇")
-    print(f"  普通笔记: {len(md_files)} 篇")
+    print(f"  普通笔记: {len(all_md_files)} 篇 (其中自动拆分 {split_count} 篇)")
     print(f"  总计:     {total_count} 篇")
     print(f"  媒体文件: {found} 个")
     print(f"  输出目录: {OUTPUT_DIR}")
