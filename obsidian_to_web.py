@@ -468,7 +468,14 @@ def main():
     # 收集所有 markdown 文件（排除置顶笔记，置顶笔记单独处理）
     md_files = sorted(NOTES_DIR.glob("*.md"), key=lambda f: f.name, reverse=True)
     md_files = [f for f in md_files if f.name not in pinned_set]
-    
+
+    # 仅转换带日期的笔记（文件名以 YYYYMMDD 开头），跳过无日期的重复副本
+    before = len(md_files)
+    md_files = [f for f in md_files if parse_date_from_filename(f.name)]
+    skipped = before - len(md_files)
+    if skipped:
+        print(f"  已跳过 {skipped} 篇不带日期的笔记（Obsidian 同步回来的重复副本）")
+
     print(f"\n找到 {len(md_files)} 篇笔记（不含 {len(PINNED_NOTES)} 篇置顶）")
 
     all_referenced_media = set()
