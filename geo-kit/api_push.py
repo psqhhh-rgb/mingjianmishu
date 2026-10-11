@@ -80,17 +80,14 @@ def local_blobs():
 
 
 def remote_blobs(token, repo, tree_sha):
-    """递归获取远端 tree 的 {path: sha}（仅 blob）。"""
+    """递归获取远端 tree 的 {完整路径: blob_sha}。使用 recursive=1，路径为完整路径。"""
     d = {}
-    stack = [tree_sha]
-    while stack:
-        t = stack.pop()
-        data = api(token, "GET", f"/repos/{repo}/git/trees/{t}?recursive=0")
-        for ent in data.get("tree", []):
-            if ent["type"] == "blob":
-                d[ent["path"]] = ent["sha"]
-            elif ent["type"] == "tree":
-                stack.append(ent["sha"])
+    data = api(token, "GET", f"/repos/{repo}/git/trees/{tree_sha}?recursive=1")
+    if data.get("truncated"):
+        raise RuntimeError("远端 tree 结果被截断，文件过多，需分页处理")
+    for ent in data.get("tree", []):
+        if ent["type"] == "blob":
+            d[ent["path"]] = ent["sha"]
     return d
 
 
@@ -133,6 +130,10 @@ def main():
     to_upload = [p for p, (mode, sha) in local.items() if remote.get(p) != sha]
     to_delete = [p for p in remote if p not in local]
     print(f"本地文件 {len(local)}，远端文件 {len(remote)}；待上传 {len(to_upload)}，删除 {len(to_delete)}", flush=True)
+
+    # 防误删保护：删除量异常偏大时中止（避免枚举异常导致远端被清空）
+    if len(to_delete) > 200:
+        sys.exit(f"中止：检测到待删除文件 {len(to_delete)} 个，疑似枚举异常，已阻止推送。")
 
     def upload(path):
         content = sh("cat-file", "blob", f"{head}:{path}", binary=True, cwd=root)
