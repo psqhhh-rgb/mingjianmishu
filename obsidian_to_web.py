@@ -278,10 +278,13 @@ def parse_date_from_filename(filename: str) -> str:
 
 
 def slugify(filename: str) -> str:
-    """将文件名转为 URL 安全的 HTML 文件名"""
-    stem = Path(filename).stem
-    # 保留中文，只替换不安全字符
-    safe = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', stem)
+    """将文件名/笔记名转为 URL 安全的 HTML 文件名。
+    只剥离末尾的 .md 扩展名（不能用 Path.stem——笔记名里可能含 '888.88' 这类点号，
+    那样会被错误地截断，导致 related 链接指向不存在的文件）。"""
+    name = Path(filename).name
+    if name.lower().endswith(".md"):
+        name = name[:-3]
+    safe = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', name)
     return safe + ".html"
 
 
