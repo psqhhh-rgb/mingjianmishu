@@ -22,6 +22,8 @@ MEDIA_DIR = Path(r"E:\psqhhh")  # 图片视频所在目录
 OUTPUT_DIR = Path(r"C:\Users\Administrator\WorkBuddy\2026-06-27-19-55-23\docs")
 ASSETS_DIR = OUTPUT_DIR / "assets"
 PAGES_DIR = OUTPUT_DIR / "notes"
+# 编者整理文章目录（与笔记同名，键为源笔记 stem）：editorial/<stem>.md
+EDITORIAL_DIR = Path(r"C:\Users\Administrator\WorkBuddy\2026-06-27-19-55-23\editorial")
 
 SITE_TITLE = "民间奇门法术实战应用"
 SITE_SUBTITLE = "紫鸢真人传授 · 笔记整理"
@@ -235,6 +237,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans
 
 .footer{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem}
 
+/* ===== 编者整理文章（样板体例）===== */
+.part-label{display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:600;
+  letter-spacing:.05em;color:#fff;background:#8a7c6a;border-radius:2rem;padding:.3rem 1rem;margin-bottom:1.2rem}
+.part-label--editor{background:linear-gradient(135deg,#8b6914,#a98424)}
+.raw-note{background:var(--bg);border:1px dashed var(--border);border-radius:.6rem;padding:1.2rem 1.3rem}
+.raw-note p{color:#4a4133;font-size:.95rem;margin-bottom:.8rem}
+.raw-note p:last-child{margin-bottom:0}
+.divider-note{display:flex;align-items:center;gap:.8rem;margin:2.5rem 0 1.8rem;
+  color:var(--muted);font-size:.8rem;letter-spacing:.1em}
+.divider-note::before,.divider-note::after{content:"";flex:1;height:1px;background:var(--border)}
+.editorial{background:var(--card);border:1px solid var(--border);border-radius:.8rem;
+  padding:1.6rem 1.6rem 1.2rem;box-shadow:0 4px 20px var(--shadow)}
+.editorial h2{border-bottom:2px solid var(--accent);padding-bottom:.4rem;
+  color:var(--accent);font-size:1.25rem;margin:1.8rem 0 .8rem}
+.editorial .ed-title{border:none;color:var(--text);font-size:1.4rem;margin:.2rem 0 1rem;padding:0}
+.tldr{background:#faf6ea;border-left:4px solid var(--accent);border-radius:.4rem;
+  padding:.9rem 1.1rem;margin:0 0 1.5rem;font-size:.92rem;color:#5c4f38}
+.related{margin-top:1.5rem;padding-top:1rem;border-top:1px dashed var(--border);
+  font-size:.85rem;color:var(--muted);line-height:1.9}
+.related a{color:var(--accent);text-decoration:none}
+.related a:hover{text-decoration:underline}
+.disclaimer{margin-top:1.5rem;font-size:.78rem;color:var(--muted);background:var(--bg);
+  border:1px solid var(--border);border-radius:.5rem;padding:.9rem 1.1rem;line-height:1.7}
+
 @media(max-width:600px){
   .hero{padding:2rem 1rem 1.5rem}
   .hero h1{font-size:1.5rem}
@@ -395,6 +421,78 @@ def process_markdown(content: str) -> tuple:
     return html_content, referenced
 
 
+# ============ 编者整理文章（editorial）============
+EDITORIAL_DISCLAIMER = (
+    '<div class="disclaimer"><strong>说明与免责：</strong>'
+    '本站为民间修炼、民俗文化与传统文化资料的整理与记录，内容源自传承者口传与个人修习体会，'
+    '仅供文化交流与研究参考，<strong>不构成医疗、健康、投资或任何功效承诺</strong>。'
+    '所述内容属传统术数范畴，请理性看待；如身体不适，请及时就医。请遵守法律法规与公序良俗。</div>'
+)
+
+
+def load_editorial(stem: str):
+    """读取同名编者整理文章（editorial/<stem>.md），返回 (meta, body) 或 None。
+    front matter 支持字段：title / tldr / related（用 | 分隔）。"""
+    path = EDITORIAL_DIR / f"{stem}.md"
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8").strip()
+    meta = {}
+    body = text
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end != -1:
+            fm = text[3:end].strip()
+            body = text[end + 4:].strip()
+            for line in fm.splitlines():
+                if ":" in line:
+                    k, v = line.split(":", 1)
+                    meta[k.strip()] = v.strip()
+    return meta, body
+
+
+def render_editorial(stem: str) -> str:
+    """将编者整理文章渲染为 HTML 区块；没有则返回空串。"""
+    data = load_editorial(stem)
+    if not data:
+        return ""
+    meta, body = data
+    md = markdown.Markdown(extensions=["extra", "sane_lists"])
+    body_html = md.convert(body)
+    title = meta.get("title", "")
+    tldr = meta.get("tldr", "")
+    related = [r.strip() for r in meta.get("related", "").split("|") if r.strip()]
+
+    parts = ['<div class="divider-note">以下为编者整理的主题文章</div>',
+             '<span class="part-label part-label--editor">编者整理 · 主题文章</span>',
+             '<div class="editorial">']
+    if title:
+        parts.append(f'<h2 class="ed-title">{html.escape(title)}</h2>')
+    if tldr:
+        parts.append(f'<div class="tldr"><strong>一句话结论：</strong>{html.escape(tldr)}</div>')
+    parts.append(body_html)
+    if related:
+        links = " · ".join(
+            f'<a href="./{slugify(r)}">{html.escape(r)}</a>' for r in related
+        )
+        parts.append(f'<div class="related"><strong>本页主题整合自以下原始记录：</strong>{links}</div>')
+    parts.append(EDITORIAL_DISCLAIMER)
+    parts.append("</div>")
+    return "\n".join(parts)
+
+
+def wrap_note_content(stem: str, html_content: str) -> str:
+    """若有编者整理文章，则在原始对话内容外加"原始对话记录"标签，并在其后追加文章；否则原样返回。"""
+    editorial_html = render_editorial(stem)
+    if not editorial_html:
+        return html_content
+    return (
+        '<span class="part-label">原始对话记录</span>\n'
+        f'<div class="raw-note">{html_content}</div>\n'
+        + editorial_html
+    )
+
+
 def auto_split_large_file(md_file: Path) -> list:
     """自动检测并拆分大于 25MB 的文件，返回拆分后的文件列表"""
     size = md_file.stat().st_size
@@ -469,12 +567,12 @@ def main():
     md_files = sorted(NOTES_DIR.glob("*.md"), key=lambda f: f.name, reverse=True)
     md_files = [f for f in md_files if f.name not in pinned_set]
 
-    # 仅转换带日期的笔记（文件名以 YYYYMMDD 开头），跳过无日期的重复副本
+    # 仅转换带日期的笔记（文件名以 YYYYMMDD 开头），跳过无日期的重复副本与空笔记
     before = len(md_files)
-    md_files = [f for f in md_files if parse_date_from_filename(f.name)]
+    md_files = [f for f in md_files if parse_date_from_filename(f.name) and f.stat().st_size > 0]
     skipped = before - len(md_files)
     if skipped:
-        print(f"  已跳过 {skipped} 篇不带日期的笔记（Obsidian 同步回来的重复副本）")
+        print(f"  已跳过 {skipped} 篇（无日期的重复副本 / 空笔记）")
 
     print(f"\n找到 {len(md_files)} 篇笔记（不含 {len(PINNED_NOTES)} 篇置顶）")
 
@@ -499,6 +597,9 @@ def main():
             f'<a class="tag" href="../tag/{t}.html">{t}</a>' for t in tags
         ) if tags else ''
         all_referenced_media.update(referenced)
+        ed = load_editorial(pinned_file.stem)
+        if ed and ed[0].get("tldr"):
+            tags_desc = ed[0]["tldr"][:120]
         meta = f"📅 {date_str}" if date_str else ""
         page_html = PAGE_TEMPLATE.format(
             title=html.escape(title),
@@ -507,7 +608,7 @@ def main():
             site_title=SITE_TITLE,
             meta=meta,
             tags_html=tags_html,
-            content=html_content
+            content=wrap_note_content(pinned_file.stem, html_content)
         )
         (PAGES_DIR / html_filename).write_text(page_html, encoding='utf-8')
         print(f"  ★ 置顶: {pinned_md}")
@@ -543,6 +644,9 @@ def main():
         tags = select_tags(title, raw_content)
         tags_list = ", ".join(tags)
         tags_desc = title[:80] + " — " + (tags[0] if tags else "")
+        ed = load_editorial(md_file.stem)
+        if ed and ed[0].get("tldr"):
+            tags_desc = ed[0]["tldr"][:120]
         tags_html = ''.join(
             f'<a class="tag" href="../tag/{t}.html">{t}</a>' for t in tags
         ) if tags else ''
@@ -558,7 +662,7 @@ def main():
             site_title=SITE_TITLE,
             meta=meta,
             tags_html=tags_html,
-            content=html_content
+            content=wrap_note_content(md_file.stem, html_content)
         )
 
         (PAGES_DIR / html_filename).write_text(page_html, encoding='utf-8')
@@ -657,11 +761,21 @@ def main():
     # 统计拆分后的文件数
     split_count = sum(1 for f in all_md_files if f.name.endswith('（上）.md') or f.name.endswith('（下）.md'))
 
+    # 统计已附加"编者整理"文章的页面数
+    ed_count = 0
+    for f in PAGES_DIR.glob("*.html"):
+        try:
+            if '编者整理 · 主题文章' in f.read_text(encoding="utf-8"):
+                ed_count += 1
+        except Exception:
+            pass
+
     print(f"\n{'=' * 60}")
     print(f"转换完成!")
     print(f"  置顶笔记: {len(PINNED_NOTES)} 篇")
     print(f"  普通笔记: {len(all_md_files)} 篇 (其中自动拆分 {split_count} 篇)")
     print(f"  总计:     {total_count} 篇")
+    print(f"  编者整理: {ed_count} 篇（含主题文章）")
     print(f"  媒体文件: {found} 个")
     print(f"  输出目录: {OUTPUT_DIR}")
     print(f"  总大小:   {size_mb:.1f} MB")

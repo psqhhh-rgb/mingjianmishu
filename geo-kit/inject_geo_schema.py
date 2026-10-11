@@ -93,7 +93,6 @@ def process_note(path: Path):
     if new == html:
         return "fail"
     if APPLY:
-        shutil.copy2(path, str(path) + ".bak")
         path.write_text(new, encoding="utf-8")
     return "ok"
 
@@ -118,7 +117,6 @@ def process_index(path: Path):
     if new == html:
         return "fail"
     if APPLY:
-        shutil.copy2(path, str(path) + ".bak")
         path.write_text(new, encoding="utf-8")
     return "ok"
 

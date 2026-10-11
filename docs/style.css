@@ -81,6 +81,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans
 
 .footer{text-align:center;padding:2rem;color:var(--muted);font-size:.8rem}
 
+/* ===== 编者整理文章（样板体例）===== */
+.part-label{display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:600;
+  letter-spacing:.05em;color:#fff;background:#8a7c6a;border-radius:2rem;padding:.3rem 1rem;margin-bottom:1.2rem}
+.part-label--editor{background:linear-gradient(135deg,#8b6914,#a98424)}
+.raw-note{background:var(--bg);border:1px dashed var(--border);border-radius:.6rem;padding:1.2rem 1.3rem}
+.raw-note p{color:#4a4133;font-size:.95rem;margin-bottom:.8rem}
+.raw-note p:last-child{margin-bottom:0}
+.divider-note{display:flex;align-items:center;gap:.8rem;margin:2.5rem 0 1.8rem;
+  color:var(--muted);font-size:.8rem;letter-spacing:.1em}
+.divider-note::before,.divider-note::after{content:"";flex:1;height:1px;background:var(--border)}
+.editorial{background:var(--card);border:1px solid var(--border);border-radius:.8rem;
+  padding:1.6rem 1.6rem 1.2rem;box-shadow:0 4px 20px var(--shadow)}
+.editorial h2{border-bottom:2px solid var(--accent);padding-bottom:.4rem;
+  color:var(--accent);font-size:1.25rem;margin:1.8rem 0 .8rem}
+.editorial .ed-title{border:none;color:var(--text);font-size:1.4rem;margin:.2rem 0 1rem;padding:0}
+.tldr{background:#faf6ea;border-left:4px solid var(--accent);border-radius:.4rem;
+  padding:.9rem 1.1rem;margin:0 0 1.5rem;font-size:.92rem;color:#5c4f38}
+.related{margin-top:1.5rem;padding-top:1rem;border-top:1px dashed var(--border);
+  font-size:.85rem;color:var(--muted);line-height:1.9}
+.related a{color:var(--accent);text-decoration:none}
+.related a:hover{text-decoration:underline}
+.disclaimer{margin-top:1.5rem;font-size:.78rem;color:var(--muted);background:var(--bg);
+  border:1px solid var(--border);border-radius:.5rem;padding:.9rem 1.1rem;line-height:1.7}
+
 @media(max-width:600px){
   .hero{padding:2rem 1rem 1.5rem}
   .hero h1{font-size:1.5rem}
