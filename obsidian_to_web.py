@@ -472,7 +472,7 @@ def render_editorial(stem: str) -> str:
     if title:
         parts.append(f'<h2 class="ed-title">{html.escape(title)}</h2>')
     if tldr:
-        parts.append(f'<div class="tldr"><strong>一句话结论：</strong>{html.escape(tldr)}</div>')
+        parts.append(f'<div class="tldr"><strong>导读：</strong>{html.escape(tldr)}</div>')
     parts.append(body_html)
     if related:
         links = " · ".join(
