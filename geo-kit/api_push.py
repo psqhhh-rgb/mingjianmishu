@@ -57,6 +57,11 @@ def api(token, method, path, data=None, retries=5):
             detail = e.read().decode("utf-8", "ignore")
             if e.code in (502, 503, 504) and attempt < retries - 1:
                 time.sleep(2 + attempt * 2); continue
+            if e.code in (403, 429) and attempt < retries - 1:
+                # GitHub 二级速率限制：退避后重试
+                wait = min(90, 20 + attempt * 15)
+                print(f"  [限速 {e.code}] 等待 {wait}s 后重试 ({attempt + 1}/{retries})", flush=True)
+                time.sleep(wait); continue
             raise RuntimeError(f"HTTP {e.code} {method} {path}: {detail}")
         except Exception:
             if attempt < retries - 1:
@@ -144,11 +149,12 @@ def main():
 
     entries = [{"path": p, "mode": "100644", "type": "blob", "sha": None} for p in to_delete]
     n = 0
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        for ent in ex.map(upload, to_upload):
-            entries.append(ent); n += 1
-            if n % 50 == 0:
-                print(f"  已上传 {n}/{len(to_upload)}", flush=True)
+    # 单线程限速上传，规避 GitHub 二级速率限制（约 60 请求/分钟）
+    for p in to_upload:
+        entries.append(upload(p)); n += 1
+        if n % 25 == 0 or n == len(to_upload):
+            print(f"  已上传 {n}/{len(to_upload)}", flush=True)
+        time.sleep(0.7)
 
     tree = api(token, "POST", f"/repos/{repo}/git/trees", {"base_tree": base_tree, "tree": entries})
     who = {"name": sh("config", "user.name", cwd=root) or "push-bot",
