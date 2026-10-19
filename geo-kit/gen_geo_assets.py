@@ -119,7 +119,7 @@ def gen_llms(notes):
     lines.append("")
     lines.append(f"> {SITE_DESC}")
     lines.append("")
-    lines.append("本网站是民间传统术法/道家实修笔记的整理与公开知识库，共 217 篇，按 7 大主题分类：")
+    lines.append(f"本网站是民间传统术法/道家实修笔记的整理与公开知识库，共 {len(notes)} 篇，按 7 大主题分类：")
     lines.append("道家、风水布局、符咒术法、民间文化、奇门遁甲、修炼修行、占卜预测。")
     lines.append("内容仅供传统文化研究与个人学习参考。")
     lines.append("")
